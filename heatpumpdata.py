@@ -7,26 +7,40 @@ class HeatPumpData():
         heat pump current settings via a CT HAT to
         get useful data about the heat pump state.
         """
-        self.client = paramiko.client.SSHClient()
-        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        pkey = paramiko.RSAKey.from_private_key_file("./id_rsa_rpi")
-        self.client.connect(ip, username=user, pkey=pkey)
+        self.key = key
+        self.user = user
+        self.ip = ip
         self.channel = channel
         self.which = which
+
+        self.client = paramiko.client.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        pkey = paramiko.RSAKey.from_private_key_file(self.key)
+        self.client.connect(self.ip, username=self.user, pkey=pkey)
+        self._lastdatacmd = (f"tail -n1 /home/pi/ctreader-docker/data"
+                             f"/{self.which}_heat_pump_ct_readings.log")
+
+        # Fill in data properties
         self.get_latest_data()
+
         self.client.close()
 
-    @property
-    def is_on(self):
-        pass
-
     def get_latest_data(self):
-        cmd = f"tail -n1 {self.which}_heat_pump_ct_readings.log"
-        stdin, stdout, stderr = self.client.exec_command(cmd)
+        stdin, stdout, stderr = self.client.exec_command(self._lastdatacmd)
         self.record = stdout.read().decode()
         self.datetimestr = self.record.split()[0]
         self.datetime = datetime.fromisoformat(self.datetimestr.split('.')[0])
         self.watts = float(self.record.split()[self.channel])
+
+    def __str__(self):
+        return (f"IP: {self.ip}, Which: {self.which}, "
+                f"Date: {self.datetimestr.split('.')[0]}, "
+                f"Watts: {self.watts}, "
+                f"Timedelta: {self.timedelta}")
+
+    @property
+    def is_on(self):
+        pass
 
     @property
     def timedelta(self):
@@ -34,10 +48,12 @@ class HeatPumpData():
 
     @property
     def is_defrosting(self):
-        # hhpwatts = $(ssh hhpmonpi tail -n1 house_heat_pump_ct_readings.log |cut -d',' -f5)
         pass
 
 if __name__ == "__main__":
     which = 'house'
     ip = "192.168.1.9"
-    hp = HeatPumpData(which, ip)
+    key = "../id_rsa_rpi"
+    hp = HeatPumpData(which, ip, key=key)
+    #print(f"{hp.timedelta=}, {hp.watts=}")
+    print(hp)
