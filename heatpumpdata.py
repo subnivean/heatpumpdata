@@ -16,9 +16,12 @@ class HeatPumpData():
         self.client = paramiko.client.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         pkey = paramiko.RSAKey.from_private_key_file(self.key)
+
+        dbpath = "/home/pi/ctreader-docker/data/heatpumpctdata.db"
+        sql = f"SELECT * FROM {which}ctdata ORDER BY DateTime DESC LIMIT 1;"
+        self._lastdatacmd = (f"sqlite3 -separator ' ' {dbpath} '{sql}'")
+
         self.client.connect(self.ip, username=self.user, pkey=pkey)
-        self._lastdatacmd = (f"tail -n1 /home/pi/ctreader-docker/data"
-                             f"/{self.which}_heat_pump_ct_readings.log")
 
         # Fill in data properties
         self.get_latest_data()
